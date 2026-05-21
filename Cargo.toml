@@ -1,0 +1,32 @@
+[package]
+name = "whatschedule"
+version = "0.1.0"
+edition = "2024"
+description = "A resilient Rust CLI for scheduling WhatsApp Web messages."
+license = "MIT"
+
+[dependencies]
+anyhow = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+chrono-tz = "0.10"
+clap = { version = "4.5", features = ["derive", "env"] }
+colored = "3.0"
+directories = "6.0"
+env_logger = "0.11"
+humantime = "2.1"
+inquire = { version = "0.9", features = ["date"] }
+log = "0.4"
+mime_guess = "2.0"
+qrcode = { version = "0.14", default-features = false }
+rand = "0.9"
+rusqlite = { version = "0.37", features = ["bundled", "chrono"] }
+ruwa = "1.0.0"
+ruwa-tokio-transport = "1.0.0"
+ruwa-ureq-http-client = "1.0.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+shell-words = "1.1"
+thiserror = "2.0"
+tokio = { version = "1.48", features = ["full"] }
+wacore-ng = "1.0.0"
+waproto-ng = "1.0.0"
