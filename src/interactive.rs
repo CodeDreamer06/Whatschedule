@@ -62,6 +62,12 @@ pub async fn run(store: &Store, wa: &WhatsApp) -> Result<()> {
 }
 
 async fn select_recipients(store: &Store, wa: &WhatsApp) -> Result<Vec<Recipient>> {
+    println!(
+        "\n{}\n{}",
+        "💡 Note: WhatsApp groups are automatically synchronized.".dimmed(),
+        "   Personal contacts must be added to your saved contacts to appear here.".dimmed()
+    );
+
     let mut choices = store.list_contacts()?;
     match wa.groups().await {
         Ok(groups) => {
@@ -78,6 +84,8 @@ async fn select_recipients(store: &Store, wa: &WhatsApp) -> Result<Vec<Recipient
 
     choices.sort_by_key(|r| format!("{}{}", kind_prefix(r), r.name.to_ascii_lowercase()));
 
+    let add_new_label = "➕ [Add a new personal contact...]".to_string();
+
     if choices.is_empty() {
         println!("{}", "📇 No saved contacts yet. Add one now.".cyan());
         let name = Text::new("Name").prompt()?;
@@ -87,24 +95,69 @@ async fn select_recipients(store: &Store, wa: &WhatsApp) -> Result<Vec<Recipient
         return Ok(vec![recipient]);
     }
 
-    let labels = choices
-        .iter()
-        .map(|r| format!("{} {} <{}>", kind_prefix(r), r.name, r.jid))
-        .collect::<Vec<_>>();
+    let mut labels = vec![add_new_label.clone()];
+    labels.extend(
+        choices
+            .iter()
+            .map(|r| format!("{} {} <{}>", kind_prefix(r), r.name, r.jid)),
+    );
+
     let selected = MultiSelect::new("Recipients", labels)
-        .with_help_message("Use space to select multiple recipients.")
+        .with_help_message("Use space to select. Select 'Add a new personal contact...' to enter details inline.")
         .prompt()?;
 
-    selected
-        .iter()
-        .map(|label| {
-            let idx = choices
-                .iter()
-                .position(|r| label.ends_with(&format!("<{}>", r.jid)))
-                .context("selected recipient disappeared")?;
-            Ok(choices[idx].clone())
-        })
-        .collect()
+    let mut recipients = Vec::new();
+    let mut added_any_new = false;
+
+    for label in &selected {
+        if label == &add_new_label {
+            added_any_new = true;
+            continue;
+        }
+        let idx = choices
+            .iter()
+            .position(|r| label.ends_with(&format!("<{}>", r.jid)))
+            .context("selected recipient disappeared")?;
+        recipients.push(choices[idx].clone());
+    }
+
+    if added_any_new {
+        loop {
+            println!("{}", "\n📇 Add a new personal contact:".cyan());
+            let name = Text::new("Name").prompt()?;
+            if name.trim().is_empty() {
+                println!("{} Contact name cannot be empty.", "⚠️".yellow());
+                continue;
+            }
+            let to = Text::new("Phone or JID").prompt()?;
+            if to.trim().is_empty() {
+                println!("{} Phone or JID cannot be empty.", "⚠️".yellow());
+                continue;
+            }
+            match Recipient::from_input(&to, Some(name.clone()), false) {
+                Ok(recipient) => {
+                    if let Err(e) = store.upsert_contact(&name, &recipient) {
+                        println!("{} Could not save contact to database: {e}", "⚠️".yellow());
+                    } else {
+                        println!("{} Saved {} <{}> successfully.", "✅".green(), name, recipient.jid);
+                        recipients.push(recipient);
+                    }
+                }
+                Err(e) => {
+                    println!("{} Invalid recipient format: {e}", "⚠️".yellow());
+                }
+            }
+
+            if !Confirm::new("Add another new personal contact?")
+                .with_default(false)
+                .prompt()?
+            {
+                break;
+            }
+        }
+    }
+
+    Ok(recipients)
 }
 
 fn ask_recurrence(default_time: &str) -> Result<Recurrence> {

@@ -32,10 +32,19 @@ impl Recipient {
         let jid = if trimmed.contains('@') {
             trimmed.to_string()
         } else {
-            let phone: String = trimmed.chars().filter(|c| c.is_ascii_digit()).collect();
+            let mut phone: String = trimmed.chars().filter(|c| c.is_ascii_digit()).collect();
             if phone.len() < 7 {
                 bail!("phone numbers must include country code, e.g. +15551234567");
             }
+
+            if !trimmed.starts_with('+') {
+                if phone.len() == 10 {
+                    phone = format!("91{phone}");
+                } else if phone.len() == 11 && phone.starts_with('0') {
+                    phone = format!("91{}", &phone[1..]);
+                }
+            }
+
             format!("{phone}@s.whatsapp.net")
         };
 
